@@ -99,7 +99,18 @@ if active_prompt:
                 
                 # 3. Save to history
                 st.session_state.messages.append({"role": "assistant", "content": final_answer})
-
+                import streamlit.components.v1 as components
+                components.html(
+                    """
+                    <script>
+                        const target = window.parent.document.querySelector('section.main');
+                        if (target) {
+                            target.scrollTop = target.scrollHeight;
+                        }
+                    </script>
+                    """,
+                    height=0
+                )
             except Exception as e:
                 error_msg = f"An error occurred: {str(e)}"
                 st.error(error_msg)

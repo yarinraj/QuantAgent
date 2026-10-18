@@ -111,20 +111,23 @@ class AIAgentCore:
             "You are QuantAgent, a professional Wall Street Quantitative Risk Advisor. "
             "Always inspect market metrics using 'get_market_summary' and evaluate risk guardrails using "
             "'evaluate_risk_guardrails' before issuing a trade recommendation. "
-            "If risk guardrails are REJECTED, adjust the proposed trade size or recommend HOLD/WAIT."
+            "If risk guardrails are REJECTED, adjust the proposed trade size or recommend HOLD/WAIT. "
+            "FORMATTING RULES: Use standard Markdown ONLY (*, **, #). NEVER use HTML tags or any LaTeX/math formatting. "
+            "CRITICAL FORMATTING RULE: DO NOT use the dollar sign ($) for currency. Always write 'USD' instead (e.g., '300 USD'). "
+            "You MUST use the '%' sign for percentages. "
+            "ALWAYS ensure there is a clear space between numbers, words, and math operators (e.g., write '1,000 USD' and not '1000USD', write '182.09 and' and not '182.09and'). "
+            "Do not use backticks (`) around numbers. Use standard Markdown for bolding (**text**) but ensure proper spacing so words do not stick together. "
+            "CONVERSATION RULES: If the user input is empty, gibberish, a typo, or just punctuation (e.g., '/', '?', ajbgihdbi sfv i, '\\'), DO NOT invoke any financial tools. Acknowledge the typo conversationally and ask the user to clarify."
         )
 
-        # 1. Initialize with System Prompt
         messages = [{"role": "system", "content": system_instruction}]
 
-        # 2. Inject Memory (Chat History) from previous turns
         if chat_history:
             for msg in chat_history:
                 if msg["role"] in ["user", "assistant"]:
                     messages.append({"role": msg["role"], "content": msg["content"]})
 
-        # 3. Add the current prompt with portfolio state
-        messages.append({"role": "user", "content": f"{user_prompt} (Available Portfolio Cash: ${portfolio_value:,.2f})"})
+        messages.append({"role": "user", "content": f"{user_prompt} (Available Portfolio Cash: {portfolio_value:,.2f} USD)"})
 
         trace_log = []
 
@@ -143,7 +146,16 @@ class AIAgentCore:
                 if response_msg.tool_calls:
                     for tool_call in response_msg.tool_calls:
                         fn_name = tool_call.function.name
-                        fn_args = json.loads(tool_call.function.arguments)
+                        
+                        # --- התיקון: הגנה ספציפית מקריסת JSON בגלל הזיות של המודל ---
+                        try:
+                            fn_args = json.loads(tool_call.function.arguments)
+                        except json.JSONDecodeError:
+                            # אם המודל פישל ביצירת הפרמטרים, נחזיר לו הערה שיתקן את עצמו מיד
+                            error_msg = json.dumps({"error": "Invalid JSON format generated for arguments. Please check your parameters and try calling the tool again."})
+                            messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": error_msg})
+                            continue
+                        # -------------------------------------------------------------
 
                         trace_log.append({
                             "iteration": iteration,
@@ -152,7 +164,6 @@ class AIAgentCore:
                             "args": fn_args
                         })
 
-                        # Execute tool and safely load JSON
                         tool_result_str = self.execute_tool(fn_name, fn_args)
                         try:
                             tool_result_dict = json.loads(tool_result_str)
@@ -165,10 +176,9 @@ class AIAgentCore:
                             "result": tool_result_dict
                         })
 
-                        # --- SHORT-CIRCUIT: Absolute protection against crashes ---
                         if "error" in tool_result_dict:
                             return {
-                                "final_answer": f"System Safeguard: I encountered an issue retrieving valid data for this asset. Please verify the ticker symbol.",
+                                "final_answer": f"System Safeguard: I encountered an issue retrieving valid data. Please verify the ticker symbol or try again.",
                                 "trace_log": trace_log
                             }
 
@@ -184,7 +194,6 @@ class AIAgentCore:
                     }
                     
             except Exception as e:
-                # Catch-all for any LLM or internal agent crashes
                 return {
                     "final_answer": f"I apologize, but I encountered an internal error processing that request. Let's try again.",
                     "trace_log": trace_log
