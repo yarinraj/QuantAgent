@@ -42,12 +42,10 @@ class MarketDataEngine:
         # --- DAY TRADING INDICATORS ---
         
         # 1. VWAP (Volume Weighted Average Price)
-        # מחיר ממוצע משוקלל נפח שמתאפס בתחילת כל יום מסחר
         df['Typical_Price'] = (df['High'] + df['Low'] + df['Close']) / 3
         df['VWAP'] = (df['Typical_Price'] * df['Volume']).groupby(df.index.date).cumsum() / df['Volume'].groupby(df.index.date).cumsum()
 
         # 2. ATR (Average True Range - 14 periods)
-        # מדד תנודתיות שמשמש לקביעת מרחק ה-Stop-Loss הדינמי
         high_low = df['High'] - df['Low']
         high_close = np.abs(df['High'] - df['Close'].shift())
         low_close = np.abs(df['Low'] - df['Close'].shift())
