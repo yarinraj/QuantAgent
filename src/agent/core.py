@@ -7,7 +7,7 @@ from src.risk.risk_engine import RiskEngine
 
 load_dotenv()
 
-class AIAgentCore:
+class QuantAgent:
     """
     AI Advisor Agent powered by Groq API (Llama-3.3-70B) and ReAct loop.
     Coordinates market data retrieval, risk guardrails evaluation, and trade recommendations.
@@ -19,24 +19,21 @@ class AIAgentCore:
         if not groq_api_key:
             raise ValueError("GROQ_API_KEY is missing from .env file.")
 
-        # Explicitly configure Groq API endpoint
         self.client = OpenAI(
             base_url="https://api.groq.com/openai/v1",
             api_key=groq_api_key
         )
-        # Active model name on Groq
         self.model = "qwen/qwen3.8-27b"
         self.data_engine = MarketDataEngine()
         self.risk_engine = RiskEngine()
         
     def get_tools_definition(self):
-        """Returns the JSON schema definitions of tools available to the LLM agent."""
         return [
             {
                 "type": "function",
                 "function": {
                     "name": "get_market_summary",
-                    "description": "Fetch real-time stock price and technical indicators (SMA_20, SMA_50, RSI_14, Volatility) for a ticker symbol.",
+                    "description": "Fetch real-time stock price and technical indicators.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -50,22 +47,20 @@ class AIAgentCore:
                 "type": "function",
                 "function": {
                     "name": "evaluate_risk_guardrails",
-                    "description": "Evaluates a proposed trade against quantitative risk guardrails (Max Drawdown, Sharpe Ratio, RSI limits, Allocation cap).",
+                    "description": "Evaluates a proposed trade against quantitative risk guardrails.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "symbol": {"type": "string", "description": "Stock symbol"},
-                            "proposed_trade_value": {"type": "number", "description": "Trade dollar amount"},
-                            "total_portfolio_value": {"type": "number", "description": "Total available portfolio cash/value"}
+                            "proposed_trade_value": {"type": "number", "description": "Trade dollar amount"}
                         },
-                        "required": ["symbol", "proposed_trade_value", "total_portfolio_value"]
+                        "required": ["symbol", "proposed_trade_value"]
                     }
                 }
             }
         ]
 
-    def execute_tool(self, tool_name: str, args: dict) -> str:
-        """Executes local Python tools based on agent function calls with global error handling."""
+    def execute_tool(self, tool_name: str, args: dict, portfolio_value: float = 10000.0) -> str:
         try:
             if tool_name == "get_market_summary":
                 symbol = args.get("symbol", "NVDA")
@@ -74,8 +69,8 @@ class AIAgentCore:
 
             elif tool_name == "evaluate_risk_guardrails":
                 symbol = args.get("symbol", "NVDA")
-                trade_val = args.get("proposed_trade_value", 2000.0)
-                portfolio_val = args.get("total_portfolio_value", 10000.0)
+                trade_val = float(args.get("proposed_trade_value", 0))
+                portfolio_val = float(portfolio_value)
 
                 raw_df = self.data_engine.fetch_historical_data(symbol)
 
@@ -101,24 +96,26 @@ class AIAgentCore:
             return json.dumps({"error": f"Unknown tool name: {tool_name}"})
             
         except Exception as e:
-            return json.dumps({"error": f"Tool execution failed due to invalid data: {str(e)}"})
+            return json.dumps({"error": f"Tool execution failed: {str(e)}"})
 
-    def run_advisor_agent(self, user_prompt: str, portfolio_value: float = 10000.0, chat_history: list = None) -> dict:
+    def run_advisor_agent(self, user_prompt: str, portfolio_value: float = 10000.0, chat_history: list = None, active_symbol: str = None) -> dict:
+        system_instruction = """
+        ROLE: You are QuantAgent, a quantitative risk co-pilot for investors. You help users understand risk; you do not make final decisions for them.
+        LANGUAGE: Reply in the language the user writes in.
+        INTENT: Infer company names/tickers from context ('tesla' -> TSLA). Silently fix minor typos. 
+        TOOLS:
+        1. Stock question without a trade amount -> call get_market_summary only, give a short view, and ask how much they plan to invest.
+        2. Call evaluate_risk_guardrails only when you have BOTH a ticker and an investment amount.
+        SAFETY: Never promise returns. Briefly note once per conversation that this is an analytical tool, not licensed financial advice.
+        FORMAT & STYLE: 
+        - Usually 2-4 sentences or bullets. No markdown headings (#). 
+        - Format currency cleanly as '$2,500' or '2,500 USD' (NEVER write 'USD 2,500').
+        CRITICAL RISK EVALUATION RULES:
+        1. Base your final answer strictly on the approval status returned by the RiskEngine tool. NEVER override a REJECTED status.
+        2. Every trade evaluation output MUST explicitly contain either the exact token **APPROVED** or **REJECTED** in uppercase bold markdown in the very first sentence.
+        Example approved: "Your proposed $2,500 trade in TSLA was **APPROVED** by our risk guardrails..."
+        Example rejected: "Your proposed $2,600 trade in TSLA was **REJECTED** by our risk guardrails..."
         """
-        Executes the ReAct loop with Chat History (Memory) to generate a risk-aware recommendation.
-        """
-        system_instruction = (
-            "You are QuantAgent, a professional Wall Street Quantitative Risk Advisor. "
-            "Always inspect market metrics using 'get_market_summary' and evaluate risk guardrails using "
-            "'evaluate_risk_guardrails' before issuing a trade recommendation. "
-            "If risk guardrails are REJECTED, adjust the proposed trade size or recommend HOLD/WAIT. "
-            "FORMATTING RULES: Use standard Markdown ONLY (*, **, #). NEVER use HTML tags or any LaTeX/math formatting. "
-            "CRITICAL FORMATTING RULE: DO NOT use the dollar sign ($) for currency. Always write 'USD' instead (e.g., '300 USD'). "
-            "You MUST use the '%' sign for percentages. "
-            "ALWAYS ensure there is a clear space between numbers, words, and math operators (e.g., write '1,000 USD' and not '1000USD', write '182.09 and' and not '182.09and'). "
-            "Do not use backticks (`) around numbers. Use standard Markdown for bolding (**text**) but ensure proper spacing so words do not stick together. "
-            "CONVERSATION RULES: If the user input is empty, gibberish, a typo, or just punctuation (e.g., '/', '?', ajbgihdbi sfv i, '\\'), DO NOT invoke any financial tools. Acknowledge the typo conversationally and ask the user to clarify."
-        )
 
         messages = [{"role": "system", "content": system_instruction}]
 
@@ -137,7 +134,9 @@ class AIAgentCore:
                     model=self.model,
                     messages=messages,
                     tools=self.get_tools_definition(),
-                    tool_choice="auto"
+                    tool_choice="auto",
+                    temperature=0.1,
+                    max_tokens=500,
                 )
 
                 response_msg = response.choices[0].message
@@ -147,15 +146,11 @@ class AIAgentCore:
                     for tool_call in response_msg.tool_calls:
                         fn_name = tool_call.function.name
                         
-                        # --- התיקון: הגנה ספציפית מקריסת JSON בגלל הזיות של המודל ---
                         try:
                             fn_args = json.loads(tool_call.function.arguments)
                         except json.JSONDecodeError:
-                            # אם המודל פישל ביצירת הפרמטרים, נחזיר לו הערה שיתקן את עצמו מיד
-                            error_msg = json.dumps({"error": "Invalid JSON format generated for arguments. Please check your parameters and try calling the tool again."})
-                            messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": error_msg})
+                            messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": json.dumps({"error": "Invalid JSON parameters."})})
                             continue
-                        # -------------------------------------------------------------
 
                         trace_log.append({
                             "iteration": iteration,
@@ -164,21 +159,16 @@ class AIAgentCore:
                             "args": fn_args
                         })
 
-                        tool_result_str = self.execute_tool(fn_name, fn_args)
+                        tool_result_str = self.execute_tool(fn_name, fn_args, portfolio_value=portfolio_value)
+                        
                         try:
                             tool_result_dict = json.loads(tool_result_str)
                         except json.JSONDecodeError:
                             tool_result_dict = {"error": "Failed to parse tool output."}
 
-                        trace_log.append({
-                            "iteration": iteration,
-                            "action": "OBSERVATION",
-                            "result": tool_result_dict
-                        })
-
                         if "error" in tool_result_dict:
                             return {
-                                "final_answer": f"System Safeguard: I encountered an issue retrieving valid data. Please verify the ticker symbol or try again.",
+                                "final_answer": f"🔧 **DEBUG ERROR (Tool):** {tool_result_dict['error']}",
                                 "trace_log": trace_log
                             }
 
@@ -195,7 +185,7 @@ class AIAgentCore:
                     
             except Exception as e:
                 return {
-                    "final_answer": f"I apologize, but I encountered an internal error processing that request. Let's try again.",
+                    "final_answer": f"🛑 **DEBUG ERROR (Agent Loop):** {str(e)}",
                     "trace_log": trace_log
                 }
 
@@ -203,18 +193,3 @@ class AIAgentCore:
             "final_answer": "Agent reached maximum iteration limit without a final conclusion.",
             "trace_log": trace_log
         }
-if __name__ == "__main__":
-    agent = AIAgentCore()
-    prompt = "Should I buy $3,000 worth of NVDA stock right now?"
-    
-    print(f"User Prompt: {prompt}\n" + "="*50)
-    result = agent.run_advisor_agent(prompt, portfolio_value=10000.0)
-
-    print("\n--- Agent Reasoning Trace ---")
-    for log in result["trace_log"]:
-        print(f"[{log['action']}] Iteration {log['iteration']}: {log.get('tool', '')} -> {log.get('args', log.get('result'))}")
-
-    print("\n🎯 --- Final Recommendation ---")
-    print(result["final_answer"])
-    
-    
