@@ -2,7 +2,6 @@ import plotly.graph_objects as go
 import pandas as pd
 
 def render_candlestick_chart(data: pd.DataFrame, symbol: str) -> go.Figure:
-    """Creates an interactive Plotly candlestick chart."""
     fig = go.Figure(data=[go.Candlestick(
         x=data.index,
         open=data['Open'],
@@ -10,7 +9,7 @@ def render_candlestick_chart(data: pd.DataFrame, symbol: str) -> go.Figure:
         low=data['Low'],
         close=data['Close'],
         name=symbol,
-        increasing_line_color='#26a69a', 
+        increasing_line_color='#26a69a',
         decreasing_line_color='#ef5350'
     )])
     
@@ -22,6 +21,13 @@ def render_candlestick_chart(data: pd.DataFrame, symbol: str) -> go.Figure:
         xaxis_rangeslider_visible=False,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)"
+    )
+    
+    fig.update_xaxes(
+        rangebreaks=[
+            dict(bounds=["sat", "mon"]), 
+            dict(bounds=[16, 9.5], pattern="hour") 
+        ]
     )
     
     return fig

@@ -161,8 +161,7 @@ with col_main:
 
     st.markdown("---")
     if symbol:
-        historical_data = agent.data_engine.fetch_historical_data(symbol, period="1mo", interval="1d")
-    
+        historical_data = agent.data_engine.fetch_historical_data(symbol, period="2d", interval="5m")
         if not historical_data.empty:
             fig = render_candlestick_chart(historical_data, symbol)
             st.plotly_chart(fig, use_container_width=True)
