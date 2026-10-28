@@ -106,15 +106,18 @@ class QuantAgent:
         TOOLS:
         1. Stock question without a trade amount -> call get_market_summary only, give a short view, and ask how much they plan to invest.
         2. Call evaluate_risk_guardrails only when you have BOTH a ticker and an investment amount.
-        SAFETY: Never promise returns. Briefly note once per conversation that this is an analytical tool, not licensed financial advice.
+        
         FORMAT & STYLE: 
         - Usually 2-4 sentences or bullets. No markdown headings (#). 
-        - Format currency cleanly as '$2,500' or '2,500 USD' (NEVER write 'USD 2,500').
+        CRITICAL UI CONSTRAINT:
+        You are strictly forbidden from using the "$" character anywhere in your response, as it triggers a bug in the frontend LaTeX parser.
+        - BAD OUTPUT: Your $1,000 trade was approved.
+        - GOOD OUTPUT: Your 1,000 USD trade was approved.
         CRITICAL RISK EVALUATION RULES:
         1. Base your final answer strictly on the approval status returned by the RiskEngine tool. NEVER override a REJECTED status.
         2. Every trade evaluation output MUST explicitly contain either the exact token **APPROVED** or **REJECTED** in uppercase bold markdown in the very first sentence.
-        Example approved: "Your proposed $2,500 trade in TSLA was **APPROVED** by our risk guardrails..."
-        Example rejected: "Your proposed $2,600 trade in TSLA was **REJECTED** by our risk guardrails..."
+        Example approved: "Your proposed 2,500 USD trade in TSLA was **APPROVED** by our risk guardrails..."
+        Example rejected: "Your proposed 2,600 USD trade in TSLA was **REJECTED** by our risk guardrails..."
         """
 
         messages = [{"role": "system", "content": system_instruction}]

@@ -1,0 +1,18 @@
+[
+    {
+        "role": "user",
+        "content": "should i buy 1000$ of tesla?"
+    },
+    {
+        "role": "assistant",
+        "content": "Your proposed 1,000 USD trade in TSLA was **APPROVED** by our risk guardrails. The allocation represents 10% of your available cash, with current technical indicators showing an RSI of 57.4 and a Sharpe ratio of 0.70. Please note that this is an analytical tool, not licensed financial advice."
+    },
+    {
+        "role": "user",
+        "content": "and 2000?"
+    },
+    {
+        "role": "assistant",
+        "content": "Your proposed 2,000 USD trade in TSLA was **APPROVED** by our risk guardrails. This allocation represents 20% of your available cash, with current technical indicators showing an RSI of 57.4 and a Sharpe ratio of 0.70. Please note that this is an analytical tool, not licensed financial advice."
+    }
+]
