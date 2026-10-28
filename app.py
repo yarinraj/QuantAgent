@@ -3,7 +3,10 @@ import requests
 from streamlit_searchbox import st_searchbox
 from src.agent.core import QuantAgent
 from src.UI.charts import render_candlestick_chart
+from src.utils.storage import load_chat_history, save_chat_history
 
+if "messages" not in st.session_state:
+    st.session_state.messages = load_chat_history()
 # 1. Page Configuration
 st.set_page_config(
     page_title="QuantAgent",
@@ -187,9 +190,10 @@ with col_chat:
                 st.markdown(msg["content"])
 
     if user_prompt := st.chat_input("Ask QuantAgent..."):
-        history = list(st.session_state.messages)  # history BEFORE this message
+        history = list(st.session_state.messages)[-15:]  # history BEFORE this message
+        
         st.session_state.messages.append({"role": "user", "content": user_prompt})
-
+        save_chat_history(st.session_state.messages) 
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(user_prompt)
@@ -203,6 +207,10 @@ with col_chat:
                         active_symbol=st.session_state.selected_ticker,
                     )
                     final_answer = response.get("final_answer", "No response generated.")
+                    final_answer = final_answer.replace("$", "USD ") # to avoid frontend LaTeX parser bug
                     st.markdown(final_answer)
 
         st.session_state.messages.append({"role": "assistant", "content": final_answer})
+        save_chat_history(st.session_state.messages) 
+    st.markdown("---") 
+    st.caption("⚠️ **Risk Warning & Disclaimer:** QuantAgent provides automated quantitative analysis for educational and informational purposes only. It is **not** a licensed financial advisor. All trading involves risk, and investment decisions are strictly your own.")
