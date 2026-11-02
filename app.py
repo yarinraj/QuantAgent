@@ -5,13 +5,15 @@ from src.agent.core import QuantAgent
 from src.UI.charts import render_candlestick_chart
 from src.UI.UI_manager import UIManager
 from src.utils.storage import load_chat_history, save_chat_history
+import base64
+from pathlib import Path
 
 # ==========================================
 # 1. Page Configuration
 # ==========================================
 st.set_page_config(
     page_title="QuantAgent",
-    page_icon="📈",
+    page_icon="assets/quantagent_favicon.png",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -60,9 +62,20 @@ agent = get_agent()
 # ==========================================
 col_logo, col_toggle = st.columns([9, 1], vertical_alignment="center")
 
-with col_logo:
-    st.markdown("### 📈 **QuantAgent**")
 
+
+@st.cache_data
+def logo_b64(path: str) -> str:
+    return base64.b64encode(Path(path).read_bytes()).decode()
+
+with col_logo:
+    theme = ui_mgr.current_theme_name
+    b64 = logo_b64(f"assets/quantagent_logo_{theme}.png")
+    st.markdown(
+        f'<img src="data:image/png;base64,{b64}" '
+        f'style="width:260px; height:auto; display:block;" alt="QuantAgent">',
+        unsafe_allow_html=True,
+    )
 with col_toggle:
     is_dark = st.toggle(
         "Theme Toggle",
