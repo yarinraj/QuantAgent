@@ -177,6 +177,45 @@ class UIManager:
                 margin-top: 2px;
             }}
 
+            /* ===== Terminal Input Labels & Pixel-Perfect Alignment ===== */
+            .input-label {{
+                font-size: 0.72rem !important;
+                font-weight: 600 !important;
+                color: var(--text-secondary) !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.5px !important;
+                margin-bottom: 6px !important;
+                margin-top: 0 !important;
+                display: block !important;
+            }}
+
+            /* Enforce exact 40px height & zero margins on both input boxes */
+            div[data-testid="stNumberInput"], 
+            div[data-testid="stNumberInput"] > div,
+            div[data-baseweb="input"],
+            .stSearchbox,
+            .stSearchbox > div {{
+                height: 40px !important;
+                min-height: 40px !important;
+                max-height: 40px !important;
+                margin-top: 0 !important;
+                margin-bottom: 0 !important;
+            }}
+
+            div[data-testid="stNumberInput"] input,
+            div[data-baseweb="input"] input {{
+                height: 40px !important;
+                line-height: 40px !important;
+                padding-top: 0 !important;
+                padding-bottom: 0 !important;
+                color: var(--text-primary) !important;
+            }}
+
+            /* Align buttons inside number input */
+            div[data-testid="stNumberInput"] button {{
+                height: 38px !important;
+            }}
+
             /* ===== Chat Component Styling Overrides ===== */
             .stChatMessage {{
                 background-color: var(--bg-secondary) !important;

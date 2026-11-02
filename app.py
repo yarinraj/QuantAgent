@@ -6,7 +6,9 @@ from src.UI.charts import render_candlestick_chart
 from src.UI.UI_manager import UIManager
 from src.utils.storage import load_chat_history, save_chat_history
 
-# 1. Page Config
+# ==========================================
+# 1. Page Configuration
+# ==========================================
 st.set_page_config(
     page_title="QuantAgent",
     page_icon="📈",
@@ -24,7 +26,9 @@ if "selected_ticker" not in st.session_state:
 if "portfolio_value" not in st.session_state:
     st.session_state.portfolio_value = 10000.0
 
-# 2. Helpers
+# ==========================================
+# 2. Cached Resources & Helpers
+# ==========================================
 @st.cache_resource
 def get_agent() -> QuantAgent:
     return QuantAgent()
@@ -51,35 +55,13 @@ def search_tickers(searchterm: str):
 
 agent = get_agent()
 
-# 3. Precision Aligned Top Control Bar
-col_logo, col_search, col_port, col_status, col_toggle = st.columns(
-    [2, 3, 2, 2, 1.2], vertical_alignment="center"
-)
+# ==========================================
+# 3. Clean & Minimal Top Header Bar
+# ==========================================
+col_logo, col_toggle = st.columns([9, 1], vertical_alignment="center")
 
 with col_logo:
     st.markdown("### 📈 **QuantAgent**")
-
-with col_search:
-    selected_value = st_searchbox(
-        search_tickers,
-        key="ticker_searchbox",
-        placeholder="Search ticker (e.g. NVDA, TSLA)...",
-    )
-    if selected_value:
-        st.session_state.selected_ticker = selected_value
-        st.rerun()
-
-with col_port:
-    st.number_input(
-        "Cash (USD)",
-        min_value=100.0,
-        step=500.0,
-        key="portfolio_value",
-        label_visibility="collapsed",  # מונע חריגת גובה
-    )
-
-with col_status:
-    ui_mgr.render_market_status()
 
 with col_toggle:
     is_dark = st.toggle(
@@ -95,16 +77,54 @@ with col_toggle:
 
 st.markdown("---")
 
+# ==========================================
 # 4. Main Grid Split (70/30)
+# ==========================================
 col_main, col_chat = ui_mgr.create_main_layout()
 
+# ------------------------------------------
+# LEFT COLUMN: Trading Terminal
+# ------------------------------------------
 with col_main:
+# Terminal Dedicated Control Strip (Search & Cash Input)
+    ctrl_search, ctrl_cash = st.columns([3.5, 1], vertical_alignment="top")
+
+    with ctrl_search:
+        st.markdown("<span class='input-label'>Search Ticker</span>", unsafe_allow_html=True)
+        selected_symbol = st_searchbox(
+            search_tickers,
+            key="symbol_searchbox",
+            placeholder="🔍 Search ticker (e.g. AAPL, TSLA, NVDA)...",
+        )
+        if selected_symbol and selected_symbol != st.session_state.selected_ticker:
+            st.session_state.selected_ticker = selected_symbol
+            st.rerun()
+
+    with ctrl_cash:
+        st.markdown("<span class='input-label'>Portfolio Cash ($)</span>", unsafe_allow_html=True)
+        st.number_input(
+            "Portfolio Cash ($)",
+            min_value=100.0,
+            step=500.0,
+            key="portfolio_value",
+            label_visibility="collapsed",  # Collapsed to use custom unified label above
+            help="Portfolio Cash ($) - Available cash for trading decisions",
+        )
+    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+
+    # Active Symbol Header & Market Status (Side by Side)
     symbol = st.session_state.selected_ticker
-    st.markdown(f"#### Active Symbol: **{symbol}**")
     
+    sym_col, stat_col = st.columns([7, 3], vertical_alignment="center")
+    with sym_col:
+        st.markdown(f"#### Active Symbol: **{symbol}**")
+    with stat_col:
+        ui_mgr.render_market_status()
+
     summary = load_summary(symbol) or {}
     ui_mgr.render_floating_metrics(summary)
 
+    # Render Plotly Candlestick Chart
     if symbol:
         historical_data = agent.data_engine.fetch_historical_data(symbol, period="2d", interval="5m")
         if not historical_data.empty:
@@ -113,6 +133,9 @@ with col_main:
         else:
             st.warning(f"No historical data found for {symbol}.")
 
+# ------------------------------------------
+# RIGHT COLUMN: AI Co-Pilot
+# ------------------------------------------
 with col_chat:
     st.subheader("🤖 AI Co-Pilot")
     chat_container = st.container(height=520)
@@ -126,11 +149,11 @@ with col_chat:
                 st.markdown(msg["content"])
 
     if user_prompt := st.chat_input("Ask QuantAgent..."):
-        history = list(st.session_state.messages)[-15:] 
-        
+        history = list(st.session_state.messages)[-15:]
+
         st.session_state.messages.append({"role": "user", "content": user_prompt})
-        save_chat_history(st.session_state.messages) 
-        
+        save_chat_history(st.session_state.messages)
+
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(user_prompt)
@@ -147,6 +170,6 @@ with col_chat:
                     st.markdown(final_answer)
 
         st.session_state.messages.append({"role": "assistant", "content": final_answer})
-        save_chat_history(st.session_state.messages) 
-        
-    st.caption("⚠️ **Risk Warning:** Automated quantitative analysis for educational purposes only.")
+        save_chat_history(st.session_state.messages)
+
+    st.caption("⚠️ **Risk Warning & Disclaimer:** QuantAgent provides automated quantitative analysis for educational and informational purposes only. It is **not** a licensed financial advisor. All trading involves risk, and investment decisions are strictly your own.")
