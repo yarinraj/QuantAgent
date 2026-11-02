@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import Any, Dict, Tuple
+
 import pytz
 import streamlit as st
 
 
 class UIManager:
-    """Manages application layout, CSS injection, theme toggling, and UI component rendering."""
+    """Manages application layout, CSS injection, theme toggling, and UI rendering."""
 
     DARK_THEME = {
         "bg_primary": "#0B0F17",
@@ -13,13 +14,16 @@ class UIManager:
         "bg_card": "rgba(22, 27, 38, 0.85)",
         "text_primary": "#F3F4F6",
         "text_secondary": "#9CA3AF",
-        "border_color": "rgba(255, 255, 255, 0.1)",
-        "accent_color": "#00F090",
-        "accent_glow": "rgba(0, 240, 144, 0.25)",
+        "border_color": "rgba(255, 255, 255, 0.12)",
+        "accent_color": "#26A69A",
+        "accent_glow": "rgba(38, 166, 154, 0.22)",
+        "positive_color": "#26A69A",
+        "negative_color": "#EF5350",
         "accent_blue": "#3B82F6",
         "chat_user_bg": "#1E293B",
         "chat_bot_bg": "#111827",
         "toggle_track": "#1F2937",
+        "iframe_filter": "none",
     }
 
     LIGHT_THEME = {
@@ -29,37 +33,39 @@ class UIManager:
         "text_primary": "#0F172A",
         "text_secondary": "#475569",
         "border_color": "rgba(0, 0, 0, 0.12)",
-        "accent_color": "#10B981",
-        "accent_glow": "rgba(16, 185, 129, 0.25)",
+        "accent_color": "#26A69A",
+        "accent_glow": "rgba(38, 166, 154, 0.22)",
+        "positive_color": "#26A69A",
+        "negative_color": "#EF5350",
         "accent_blue": "#2563EB",
         "chat_user_bg": "#E2E8F0",
         "chat_bot_bg": "#F8FAFC",
         "toggle_track": "#CBD5E1",
+        "iframe_filter": "invert(1) hue-rotate(180deg)",
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._init_theme_state()
 
     def _init_theme_state(self) -> None:
-        """Initialize default theme to dark if not set."""
+        """Initialize the application theme to dark when no theme is stored."""
         if "theme" not in st.session_state:
             st.session_state["theme"] = "dark"
 
     @property
     def current_theme_name(self) -> str:
-        return st.session_state["theme"]
+        return st.session_state.get("theme", "dark")
 
     @property
     def theme_config(self) -> Dict[str, str]:
-        return (
-            self.DARK_THEME
-            if self.current_theme_name == "dark"
-            else self.LIGHT_THEME
-        )
+        if self.current_theme_name == "light":
+            return self.LIGHT_THEME
+        return self.DARK_THEME
 
     def inject_global_styles(self) -> None:
-        """Injects dynamic theme variables and precise CSS overrides."""
+        """Inject global styles and theme-aware styles for the app widgets."""
         cfg = self.theme_config
+
         css = f"""
         <style>
             :root {{
@@ -71,10 +77,13 @@ class UIManager:
                 --border-color: {cfg['border_color']};
                 --accent-color: {cfg['accent_color']};
                 --accent-glow: {cfg['accent_glow']};
+                --positive-color: {cfg['positive_color']};
+                --negative-color: {cfg['negative_color']};
                 --accent-blue: {cfg['accent_blue']};
                 --chat-user-bg: {cfg['chat_user_bg']};
                 --chat-bot-bg: {cfg['chat_bot_bg']};
                 --toggle-track: {cfg['toggle_track']};
+                --iframe-filter: {cfg['iframe_filter']};
             }}
 
             /* ===== App General Setup ===== */
@@ -83,7 +92,9 @@ class UIManager:
                 color: var(--text-primary) !important;
             }}
 
-            #MainMenu, footer, header {{ visibility: hidden; }}
+            #MainMenu, footer, header {{
+                visibility: hidden;
+            }}
 
             .block-container {{
                 padding-top: 1.2rem !important;
@@ -91,29 +102,32 @@ class UIManager:
                 max-width: 96% !important;
             }}
 
-            /* ===== Base Inputs & Searchbox Override ===== */
-            div[data-baseweb="input"], div[data-baseweb="select"] {{
-                background-color: var(--bg-secondary) !important;
-                border-radius: 8px !important;
-                border: 1px solid var(--border-color) !important;
-                color: var(--text-primary) !important;
+            /* ===== Theme-aware horizontal divider ===== */
+            hr {{
+                border: none !important;
+                border-top: 1px solid var(--border-color) !important;
+                opacity: 1 !important;
             }}
 
-            div[data-baseweb="input"] input {{
-                color: var(--text-primary) !important;
+            /* ===== Searchbox iframe ===== */
+            iframe[title*="searchbox"] {{
+                filter: var(--iframe-filter) !important;
+                transition: filter 0.3s ease;
             }}
 
-            /* ===== Market Status Pulse Indicator ===== */
+            /* ===== Market Status Indicator ===== */
             @keyframes pulse-green {{
-                0% {{ box-shadow: 0 0 0 0 rgba(0, 240, 144, 0.6); }}
-                70% {{ box-shadow: 0 0 0 6px rgba(0, 240, 144, 0); }}
-                100% {{ box-shadow: 0 0 0 0 rgba(0, 240, 144, 0); }}
+                0% {{ box-shadow: 0 0 0 0 rgba(38, 166, 154, 0.60); }}
+                70% {{ box-shadow: 0 0 0 6px rgba(38, 166, 154, 0); }}
+                100% {{ box-shadow: 0 0 0 0 rgba(38, 166, 154, 0); }}
             }}
+
             @keyframes pulse-red {{
-                0% {{ box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.6); }}
-                70% {{ box-shadow: 0 0 0 6px rgba(255, 77, 77, 0); }}
-                100% {{ box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }}
+                0% {{ box-shadow: 0 0 0 0 rgba(239, 83, 80, 0.60); }}
+                70% {{ box-shadow: 0 0 0 6px rgba(239, 83, 80, 0); }}
+                100% {{ box-shadow: 0 0 0 0 rgba(239, 83, 80, 0); }}
             }}
+
             .market-status {{
                 display: flex;
                 align-items: center;
@@ -123,17 +137,21 @@ class UIManager:
                 color: var(--text-secondary);
                 padding: 6px 0;
             }}
+
             .status-dot {{
-                height: 9px; width: 9px;
+                width: 9px;
+                height: 9px;
                 border-radius: 50%;
                 display: inline-block;
             }}
+
             .status-dot.open {{
-                background-color: var(--accent-color);
+                background-color: var(--positive-color);
                 animation: pulse-green 2s infinite;
             }}
+
             .status-dot.closed {{
-                background-color: #FF4D4D;
+                background-color: var(--negative-color);
                 animation: pulse-red 2s infinite;
             }}
 
@@ -177,7 +195,7 @@ class UIManager:
                 margin-top: 2px;
             }}
 
-            /* ===== Terminal Input Labels & Pixel-Perfect Alignment ===== */
+            /* ===== Terminal Input Labels ===== */
             .input-label {{
                 font-size: 0.72rem !important;
                 font-weight: 600 !important;
@@ -189,12 +207,11 @@ class UIManager:
                 display: block !important;
             }}
 
-            /* Enforce exact 40px height & zero margins on both input boxes */
-            div[data-testid="stNumberInput"], 
-            div[data-testid="stNumberInput"] > div,
-            div[data-baseweb="input"],
+            /* Keep the ticker searchbox and cash input aligned. */
             .stSearchbox,
-            .stSearchbox > div {{
+            .stSearchbox > div,
+            .st-key-portfolio_value [data-testid="stNumberInput"],
+            .st-key-portfolio_value [data-testid="stNumberInputContainer"] {{
                 height: 40px !important;
                 min-height: 40px !important;
                 max-height: 40px !important;
@@ -202,21 +219,75 @@ class UIManager:
                 margin-bottom: 0 !important;
             }}
 
-            div[data-testid="stNumberInput"] input,
-            div[data-baseweb="input"] input {{
-                height: 40px !important;
-                line-height: 40px !important;
-                padding-top: 0 !important;
-                padding-bottom: 0 !important;
-                color: var(--text-primary) !important;
+            /* ===== Portfolio Cash: theme-aware input ===== */
+            .st-key-portfolio_value [data-testid="stNumberInputContainer"] {{
+                box-sizing: border-box !important;
+                background-color: var(--bg-secondary) !important;
+                border: 1px solid var(--border-color) !important;
+                border-radius: 8px !important;
+                overflow: hidden !important;
             }}
 
-            /* Align buttons inside number input */
-            div[data-testid="stNumberInput"] button {{
+            .st-key-portfolio_value input[data-testid="stNumberInputField"] {{
                 height: 38px !important;
+                min-height: 38px !important;
+                box-sizing: border-box !important;
+                background-color: transparent !important;
+                color: var(--text-primary) !important;
+                -webkit-text-fill-color: var(--text-primary) !important;
             }}
 
-            /* ===== Chat Component Styling Overrides ===== */
+            /* ===== Portfolio Cash: Minus button (red) ===== */
+            .st-key-portfolio_value button[data-testid="stNumberInputStepDown"]:enabled {{
+                color: var(--negative-color) !important;
+                background-color: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                transition: color 0.2s ease, background-color 0.2s ease !important;
+            }}
+
+            .st-key-portfolio_value button[data-testid="stNumberInputStepDown"]:enabled svg {{
+                color: var(--negative-color) !important;
+            }}
+
+            .st-key-portfolio_value button[data-testid="stNumberInputStepDown"]:hover:enabled {{
+                color: var(--negative-color) !important;
+                background-color: rgba(239, 83, 80, 0.14) !important;
+            }}
+
+            .st-key-portfolio_value button[data-testid="stNumberInputStepDown"]:focus:enabled:not(:hover) {{
+                color: var(--negative-color) !important;
+                background-color: transparent !important;
+                box-shadow: none !important;
+                outline: none !important;
+            }}
+
+            /* ===== Portfolio Cash: Plus button (green) ===== */
+            .st-key-portfolio_value button[data-testid="stNumberInputStepUp"]:enabled {{
+                color: var(--positive-color) !important;
+                background-color: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                transition: color 0.2s ease, background-color 0.2s ease !important;
+            }}
+
+            .st-key-portfolio_value button[data-testid="stNumberInputStepUp"]:enabled svg {{
+                color: var(--positive-color) !important;
+            }}
+
+            .st-key-portfolio_value button[data-testid="stNumberInputStepUp"]:hover:enabled {{
+                color: var(--positive-color) !important;
+                background-color: rgba(38, 166, 154, 0.14) !important;
+            }}
+
+            .st-key-portfolio_value button[data-testid="stNumberInputStepUp"]:focus:enabled:not(:hover) {{
+                color: var(--positive-color) !important;
+                background-color: transparent !important;
+                box-shadow: none !important;
+                outline: none !important;
+            }}
+
+            /* ===== Chat Component ===== */
             .stChatMessage {{
                 background-color: var(--bg-secondary) !important;
                 border: 1px solid var(--border-color) !important;
@@ -229,12 +300,19 @@ class UIManager:
             }}
 
             div[data-testid="stChatInputContainer"],
-            div[data-testid="stChatInput"] {{
-                border-radius: 12px !important;
-                border: 1px solid var(--border-color) !important;
+            div[data-testid="stChatInputContainer"] > div,
+            div[data-testid="stChatInput"],
+            div[data-testid="stChatInput"] > div,
+            div[data-testid="stChatInput"] > div > div {{
                 background-color: var(--bg-secondary) !important;
-                outline: none !important;
-                transition: all 0.2s ease-in-out;
+                border-color: var(--border-color) !important;
+                border-radius: 12px !important;
+            }}
+
+            div[data-testid="stChatInput"] textarea {{
+                background-color: transparent !important;
+                color: var(--text-primary) !important;
+                -webkit-text-fill-color: var(--text-primary) !important;
             }}
 
             div[data-testid="stChatInputContainer"]:focus-within,
@@ -243,19 +321,17 @@ class UIManager:
                 box-shadow: 0 0 10px var(--accent-glow) !important;
             }}
 
-            /* ===== iOS-Style Toggle Switch (DOM Override) ===== */
-            
-            /* Align container & hide widget label */
+            /* ===== Theme Toggle ===== */
             div[data-testid="stCheckbox"]:has(input[aria-label="Theme Toggle"]) {{
                 display: flex !important;
                 justify-content: flex-end !important;
                 padding-top: 4px !important;
             }}
+
             div[data-testid="stCheckbox"]:has(input[aria-label="Theme Toggle"]) div[data-testid="stWidgetLabel"] {{
                 display: none !important;
             }}
 
-            /* Track styling */
             span:has(input[aria-label="Theme Toggle"]) + div {{
                 background-color: var(--toggle-track) !important;
                 border: 1px solid var(--border-color) !important;
@@ -267,13 +343,12 @@ class UIManager:
                 transition: background-color 0.3s ease !important;
             }}
 
-            /* Base Knob styling (Light Mode) */
             span:has(input[aria-label="Theme Toggle"]) + div > div {{
                 background-color: #FFFFFF !important;
                 width: 22px !important;
                 height: 22px !important;
                 border-radius: 50% !important;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
@@ -281,21 +356,18 @@ class UIManager:
                 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
             }}
 
-            /* Sun emoji for light mode (unchecked) */
             span:has(input[aria-label="Theme Toggle"]:not(:checked)) + div > div::after {{
                 content: "☀️" !important;
                 font-size: 13px !important;
                 position: absolute !important;
             }}
 
-            /* Dark Mode Knob Override: Darker background & shifted further right */
             span:has(input[aria-label="Theme Toggle"]:checked) + div > div {{
                 background-color: #1E293B !important;
                 border: 1px solid rgba(255, 255, 255, 0.15) !important;
                 transform: translateX(24px) !important;
             }}
 
-            /* Moon emoji for dark mode (checked) */
             span:has(input[aria-label="Theme Toggle"]:checked) + div > div::after {{
                 content: "🌙" !important;
                 font-size: 13px !important;
@@ -303,22 +375,19 @@ class UIManager:
             }}
         </style>
         """
+
         st.markdown(css, unsafe_allow_html=True)
 
     def render_market_status(self) -> None:
-        """Renders live pulsing dot based on US Market Hours (EST)."""
+        """Render a US market-hours indicator using Eastern Time."""
         tz = pytz.timezone("US/Eastern")
         now = datetime.now(tz)
+
         is_open = False
         if now.weekday() < 5:
-            market_start = now.replace(
-                hour=9, minute=30, second=0, microsecond=0
-            )
-            market_end = now.replace(
-                hour=16, minute=0, second=0, microsecond=0
-            )
-            if market_start <= now <= market_end:
-                is_open = True
+            market_start = now.replace(hour=9, minute=30, second=0, microsecond=0)
+            market_end = now.replace(hour=16, minute=0, second=0, microsecond=0)
+            is_open = market_start <= now <= market_end
 
         status_text = "MARKET LIVE" if is_open else "MARKET CLOSED"
         dot_class = "open" if is_open else "closed"
@@ -332,21 +401,19 @@ class UIManager:
         st.markdown(html, unsafe_allow_html=True)
 
     def create_main_layout(self) -> Tuple[Any, Any]:
-        """Creates 70% / 30% grid split for Trading Terminal and AI Co-Pilot."""
+        """Create the main trading and chat columns."""
         return st.columns([7, 3], gap="medium")
 
     def render_floating_metrics(self, market_summary: Dict[str, Any]) -> None:
-        """Renders custom metric cards above the chart region."""
+        """Render the market summary cards."""
         price = market_summary.get("latest_price", "N/A")
         vwap = market_summary.get("vwap", "N/A")
         rsi = market_summary.get("rsi_14", "N/A")
-        atr = market_summary.get(
-            "atr_14", market_summary.get("atr", "N/A")
-        )
+        atr = market_summary.get("atr_14", market_summary.get("atr", "N/A"))
 
-        def fmt(val, suffix=""):
+        def fmt(value: Any, suffix: str = "") -> str:
             try:
-                return f"{float(val):,.2f}{suffix}"
+                return f"{float(value):,.2f}{suffix}"
             except (ValueError, TypeError):
                 return "N/A"
 

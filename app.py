@@ -128,7 +128,7 @@ with col_main:
     if symbol:
         historical_data = agent.data_engine.fetch_historical_data(symbol, period="2d", interval="5m")
         if not historical_data.empty:
-            fig = render_candlestick_chart(historical_data, symbol)
+            fig = render_candlestick_chart(historical_data, symbol, theme=ui_mgr.current_theme_name)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning(f"No historical data found for {symbol}.")
