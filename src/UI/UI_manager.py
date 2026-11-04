@@ -214,6 +214,8 @@ class UIManager:
         "toggle_track": "#1F2937",
         "avatar_bg": "#111F28",
         "avatar_border": "rgba(38, 166, 154, 0.45)",
+        "skeleton_base": "rgba(255, 255, 255, 0.06)",
+        "skeleton_highlight": "rgba(255, 255, 255, 0.13)",
         "iframe_filter": "none",
     }
 
@@ -236,6 +238,8 @@ class UIManager:
         "toggle_track": "#CBD5E1",
         "avatar_bg": "#FFFFFF",
         "avatar_border": "rgba(38, 166, 154, 0.50)",
+        "skeleton_base": "rgba(15, 23, 42, 0.06)",
+        "skeleton_highlight": "rgba(15, 23, 42, 0.12)",
         "iframe_filter": "invert(1) hue-rotate(180deg)",
     }
 
@@ -288,6 +292,8 @@ class UIManager:
                 --toggle-track: {cfg['toggle_track']};
                 --avatar-bg: {cfg['avatar_bg']};
                 --avatar-border: {cfg['avatar_border']};
+                --skeleton-base: {cfg['skeleton_base']};
+                --skeleton-highlight: {cfg['skeleton_highlight']};
                 --iframe-filter: {cfg['iframe_filter']};
                 --font-primary: 'Poppins', sans-serif;
                 --font-numeric: 'Inter', sans-serif;
@@ -771,10 +777,18 @@ class UIManager:
                 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
             }}
 
-            span:has(input[aria-label="Theme Toggle"]:not(:checked)) + div > div::after {{
-                content: "☀️" !important;
-                font-size: 13px !important;
+            span:has(input[aria-label="Theme Toggle"]) + div > div::after {{
+                content: "" !important;
                 position: absolute !important;
+                width: 14px !important;
+                height: 14px !important;
+                background-repeat: no-repeat !important;
+                background-position: center !important;
+                background-size: contain !important;
+            }}
+
+            span:has(input[aria-label="Theme Toggle"]:not(:checked)) + div > div::after {{
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F59E0B' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='4.2' fill='%23F59E0B'/%3E%3Cpath d='M12 2.5v2.3M12 19.2v2.3M2.5 12h2.3M19.2 12h2.3M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6'/%3E%3C/svg%3E") !important;
             }}
 
             span:has(input[aria-label="Theme Toggle"]:checked) + div > div {{
@@ -784,9 +798,7 @@ class UIManager:
             }}
 
             span:has(input[aria-label="Theme Toggle"]:checked) + div > div::after {{
-                content: "🌙" !important;
-                font-size: 13px !important;
-                position: absolute !important;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z' fill='%23E2E8F0'/%3E%3C/svg%3E") !important;
             }}
 
             /* ===== Quant Analyst Header ===== */
@@ -880,6 +892,46 @@ class UIManager:
                 .assistant-header-status {{ display: none; }}
                 .assistant-header-subtitle {{ font-size: 0.52rem; }}
             }}
+            /* ===== Loading Skeletons ===== */
+            @keyframes qa-shimmer {{
+                0% {{ background-position: 200% 0; }}
+                100% {{ background-position: -200% 0; }}
+            }}
+
+            .qa-skel {{
+                display: inline-block;
+                vertical-align: middle;
+                border-radius: 6px;
+                background: linear-gradient(
+                    90deg,
+                    var(--skeleton-base) 25%,
+                    var(--skeleton-highlight) 50%,
+                    var(--skeleton-base) 75%
+                );
+                background-size: 200% 100%;
+                animation: qa-shimmer 1.5s ease-in-out infinite;
+            }}
+
+            .qa-skel-label {{ width: 58px; height: 9px; }}
+            .qa-skel-value {{ width: 112px; height: 17px; }}
+
+            .qa-chart-skel {{
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                width: 100%;
+                padding: 16px 18px;
+                border: 1px solid var(--border-color);
+                border-radius: 10px;
+                background: var(--bg-card);
+            }}
+            .qa-chart-skel .qa-skel-title {{ width: 150px; height: 14px; margin-bottom: 14px; }}
+            .qa-chart-skel .qa-skel-plot {{ display: block; flex: 1; width: 100%; border-radius: 8px; }}
+
+            @media (prefers-reduced-motion: reduce) {{
+                .qa-skel {{ animation: none; }}
+            }}
+
             /* ===== Global Footer (Disclaimer) ===== */
             hr.footer-divider {{
                 border: none !important;
@@ -1009,8 +1061,8 @@ class UIManager:
         """Create the main trading and chat columns."""
         return st.columns([7, 3], gap="medium")
 
-    def render_floating_metrics(self, market_summary: Dict[str, Any]) -> None:
-        """Render the market summary cards."""
+    def floating_metrics_html(self, market_summary: Dict[str, Any]) -> str:
+        """HTML for the market summary cards."""
         price = market_summary.get("latest_price", "N/A")
         vwap = market_summary.get("vwap", "N/A")
         rsi = market_summary.get("rsi_14", "N/A")
@@ -1022,7 +1074,7 @@ class UIManager:
             except (ValueError, TypeError):
                 return "N/A"
 
-        html_block = f"""
+        return f"""
         <div class="floating-metrics-container">
             <div class="metric-card">
                 <div class="metric-label">Latest Price</div>
@@ -1042,4 +1094,27 @@ class UIManager:
             </div>
         </div>
         """
-        st.markdown(html_block, unsafe_allow_html=True)
+
+    def render_floating_metrics(self, market_summary: Dict[str, Any]) -> None:
+        """Render the market summary cards."""
+        st.markdown(self.floating_metrics_html(market_summary), unsafe_allow_html=True)
+
+    # ----- loading skeletons -----
+    def metrics_skeleton_html(self) -> str:
+        """Placeholder cards with the same geometry as the real metric cards."""
+        card = (
+            '<div class="metric-card">'
+            '<div class="metric-label"><span class="qa-skel qa-skel-label"></span></div>'
+            '<div class="metric-value"><span class="qa-skel qa-skel-value"></span></div>'
+            "</div>"
+        )
+        return f'<div class="floating-metrics-container">{card * 4}</div>'
+
+    def chart_skeleton_html(self, height: int = 450) -> str:
+        """Placeholder block that reserves the chart's space while data loads."""
+        return (
+            f'<div class="qa-chart-skel" style="height:{int(height)}px;">'
+            '<span class="qa-skel qa-skel-title"></span>'
+            '<span class="qa-skel qa-skel-plot"></span>'
+            "</div>"
+        )
