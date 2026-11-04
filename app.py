@@ -7,7 +7,6 @@ from streamlit_searchbox import st_searchbox
 from src.agent.core import QuantAgent
 from src.UI.charts import render_candlestick_chart
 from src.UI.UI_manager import UIManager
-from src.utils.storage import load_chat_history, save_chat_history
 
 
 class QuantAgentApp:
@@ -19,7 +18,7 @@ class QuantAgentApp:
     DEFAULT_PORTFOLIO = 10000.0
     HISTORY_WINDOW = 15
     LOGO_WIDTH = 220
-    CHART_SKELETON_HEIGHT = 450  # keep close to the real chart height to avoid layout jumps
+    CHART_SKELETON_HEIGHT = 400  # matches the chart height set in src/UI/charts.py
     YAHOO_SEARCH_URL = "https://query2.finance.yahoo.com/v1/finance/search"
 
     DISCLAIMER = (
@@ -48,7 +47,9 @@ class QuantAgentApp:
     def _init_session_state(self) -> None:
         state = st.session_state
         if "messages" not in state:
-            state.messages = load_chat_history()
+            # Session-only chat history: lives in this browser session,
+            # isolated per visitor, cleared on page refresh.
+            state.messages = []
         if "selected_ticker" not in state:
             state.selected_ticker = self.DEFAULT_TICKER
         if "portfolio_value" not in state:
@@ -229,7 +230,6 @@ class QuantAgentApp:
         history = list(st.session_state.messages)[-self.HISTORY_WINDOW :]
 
         st.session_state.messages.append({"role": "user", "content": user_prompt})
-        save_chat_history(st.session_state.messages)
 
         with chat_container:
             empty_slot.empty()
@@ -246,7 +246,6 @@ class QuantAgentApp:
             )
 
         st.session_state.messages.append({"role": "assistant", "content": final_answer})
-        save_chat_history(st.session_state.messages)
 
     def _ask_agent(self, user_prompt: str, history: List[Dict[str, str]]) -> str:
         response = self.agent.run_advisor_agent(
