@@ -19,13 +19,14 @@ class QuantAgentApp:
     DEFAULT_PORTFOLIO = 10000.0
     HISTORY_WINDOW = 15
     LOGO_WIDTH = 220
+    CHART_SKELETON_HEIGHT = 450  # keep close to the real chart height to avoid layout jumps
     YAHOO_SEARCH_URL = "https://query2.finance.yahoo.com/v1/finance/search"
 
     DISCLAIMER = (
-        "⚠️ <strong>Risk Warning & Disclaimer:</strong> QuantAgent provides automated "
-        "quantitative analysis for educational and informational purposes only. "
-        "It is <strong>not</strong> a licensed financial advisor. All trading involves risk, "
-        "and investment decisions are strictly your own."
+        "⚠️ <strong>Risk Warning & Disclaimer:</strong> QuantAgent is an educational AI demonstration "
+        "tool using automated language models. AI outputs may contain inaccuracies. It is <strong>not</strong> "
+        "a licensed financial advisor, does <strong>not</strong> offer investment advice, and assumes "
+        "<strong>no liability</strong> for any financial decisions or trading losses. All trading involves risk."
     )
 
     # ==========================================
@@ -57,7 +58,7 @@ class QuantAgentApp:
     # Cached resources & data helpers
     # ==========================================
     @staticmethod
-    @st.cache_resource
+    @st.cache_resource(show_spinner="Starting QuantAgent...")
     def get_agent() -> QuantAgent:
         return QuantAgent()
 
@@ -68,6 +69,15 @@ class QuantAgentApp:
             return QuantAgentApp.get_agent().data_engine.get_market_summary(symbol)
         except Exception:
             return None
+
+    @staticmethod
+    @st.cache_data(ttl=60, show_spinner=False)
+    def load_history(symbol: str):
+        """Cached so chat messages / theme toggles don't refetch market data.
+        Exceptions are not cached; the caller handles them."""
+        return QuantAgentApp.get_agent().data_engine.fetch_historical_data(
+            symbol, period="2d", interval="5m"
+        )
 
     @classmethod
     def search_tickers(cls, searchterm: str) -> List[Tuple[str, str]]:
@@ -124,8 +134,12 @@ class QuantAgentApp:
         with stat_col:
             self.ui.render_market_status()
 
+        metrics_slot = st.empty()
+        metrics_slot.markdown(self.ui.metrics_skeleton_html(), unsafe_allow_html=True)
         summary = self.load_summary(symbol) or {}
-        self.ui.render_floating_metrics(summary)
+        metrics_slot.markdown(
+            self.ui.floating_metrics_html(summary), unsafe_allow_html=True
+        )
 
         self._render_price_chart(symbol)
 
@@ -163,16 +177,27 @@ class QuantAgentApp:
     def _render_price_chart(self, symbol: str) -> None:
         if not symbol:
             return
-        historical_data = self.agent.data_engine.fetch_historical_data(
-            symbol, period="2d", interval="5m"
+
+        chart_slot = st.empty()
+        chart_slot.markdown(
+            self.ui.chart_skeleton_html(self.CHART_SKELETON_HEIGHT),
+            unsafe_allow_html=True,
         )
-        if historical_data.empty:
-            st.warning(f"No historical data found for {symbol}.")
+
+        try:
+            historical_data = self.load_history(symbol)
+        except Exception:
+            chart_slot.warning(f"Could not load market data for {symbol}.")
             return
+
+        if historical_data is None or historical_data.empty:
+            chart_slot.warning(f"No historical data found for {symbol}.")
+            return
+
         fig = render_candlestick_chart(
             historical_data, symbol, theme=self.ui.current_theme_name
         )
-        st.plotly_chart(fig, use_container_width=True)
+        chart_slot.plotly_chart(fig, use_container_width=True)
 
     # ==========================================
     # Right column: AI co-pilot
